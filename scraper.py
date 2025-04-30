@@ -50,6 +50,22 @@ def extract_next_links(url, resp):
         print(f"Error extracting links: {e}")
         return [] 
 
+def extract_tokens(resp):
+    try:
+        if resp.status == 200:
+            soup = BeautifulSoup(resp.content, "lxml")
+            texts = " ".join(soup.stripped_strings)
+
+            tokens = []
+            for i in texts.split():
+                word_alnum = ""
+                for char in i:
+                    if char.isalnum():
+                        word_alnum += char.lower()
+
+                if word_alnum not in STOPWORDS:
+                    tokens.append(word_alnum)
+
 def is_valid(url):
     # Decide whether to crawl this url or not. 
     # If you decide to crawl it, return True; otherwise return False.
