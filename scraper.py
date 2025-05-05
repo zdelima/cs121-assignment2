@@ -51,20 +51,20 @@ def extract_next_links(url, resp):
         return [] 
 
 def extract_tokens(resp):
-    try:
-        if resp.status == 200:
-            soup = BeautifulSoup(resp.content, "lxml")
-            texts = " ".join(soup.stripped_strings)
+    tokens = []
+    if resp.status != 200 or not hasattr(resp.raw_response, 'content'):
+        return tokens
+    
+    soup = BeautifulSoup(resp.content, "lxml")
+    texts = " ".join(soup.stripped_strings)
 
-            tokens = []
-            for i in texts.split():
-                word_alnum = ""
-                for char in i:
-                    if char.isalnum():
-                        word_alnum += char.lower()
+            
+    for i in re.findall(r'\w+', texts.lower()):
+        if i not in STOPWORDS:
+            tokens.append(word)
 
-                if word_alnum not in STOPWORDS:
-                    tokens.append(word_alnum)
+    return tokens
+            
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
