@@ -3,6 +3,7 @@ from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
+Common_w = {}
 STOPWORDS = {
     'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any', 'are', 'aren\'t',
     'as', 'at', 'be', 'because', 'been', 'before', 'being', 'below', 'between', 'both', 'but', 'by',
@@ -62,7 +63,12 @@ def extract_tokens(resp):
     for i in re.findall(r'\w+', texts.lower()):
         if i not in STOPWORDS:
             tokens.append(i)
-
+            
+    for y in tokens:
+        if y in Common_w:
+            Common_w[y] +=1
+        else:
+            Common_w[y] =1
     return tokens
             
 
