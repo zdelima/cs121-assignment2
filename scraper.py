@@ -1,104 +1,122 @@
+#!/usr/bin/env python3
 import re
-from urllib.parse import urljoin, urlparse
-
+from urllib.parse import urljoin, urlparse, urldefrag
 from bs4 import BeautifulSoup
+from collections import Counter, defaultdict
+from utils.response import Response
 
-Common_w = {}
+seen_urls = set()
+page_word_counts = {}
+word_freq = Counter()
+subdomain_counts = defaultdict(int)
+
 STOPWORDS = {
-    'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any', 'are', 'aren\'t',
-    'as', 'at', 'be', 'because', 'been', 'before', 'being', 'below', 'between', 'both', 'but', 'by',
-    'can\'t', 'cannot', 'could', 'couldn\'t', 'did', 'didn\'t', 'do', 'does', 'doesn\'t', 'doing', 'don\'t',
-    'down', 'during', 'each', 'few', 'for', 'from', 'further', 'had', 'hadn\'t', 'has', 'hasn\'t', 'have', 'haven\'t',
-    'having', 'he', 'he\'d', 'he\'ll', 'he\'s', 'her', 'here', 'here\'s', 'hers', 'herself', 'him', 'himself', 'his',
-    'how', 'how\'s', 'i', 'i\'d', 'i\'ll', 'i\'m', 'i\'ve', 'if', 'in', 'into', 'is', 'isn\'t', 'it', 'it\'s',
-    'its', 'itself', 'let\'s', 'me', 'more', 'most', 'mustn\'t', 'my', 'myself', 'no', 'nor', 'not', 'of', 'off',
-    'on', 'once', 'only', 'or', 'other', 'ought', 'our', 'ours', 'ourselves', 'out', 'over', 'own', 'same', 'shan\'t',
-    'she', 'she\'d', 'she\'ll', 'she\'s', 'should', 'shouldn\'t', 'so', 'some', 'such', 'than', 'that', 'that\'s',
-    'the', 'their', 'theirs', 'them', 'themselves', 'then', 'there', 'there\'s', 'these', 'they', 'they\'d', 'they\'ll',
-    'they\'re', 'they\'ve', 'this', 'those', 'through', 'to', 'too', 'under', 'until', 'up', 'very', 'was', 'wasn\'t',
-    'we', 'we\'d', 'we\'ll', 'we\'re', 'we\'ve', 'were', 'weren\'t', 'what', 'what\'s', 'when', 'when\'s', 'where',
-    'where\'s', 'which', 'while', 'who', 'who\'s', 'whom', 'why', 'why\'s', 'with', 'won\'t', 'would', 'wouldn\'t',
-    'you', 'you\'d', 'you\'ll', 'you\'re', 'you\'ve', 'your', 'yours', 'yourself', 'yourselves'
+    'a','about','above','after','again','against','all','am','an','and','any','are','aren't',
+    'as','at','be','because','been','before','being','below','between','both','but','by',
+    'can't','cannot','could','couldn't','did','didn't','do','does','doesn't','doing','don't',
+    'down','during','each','few','for','from','further','had','hadn't','has','hasn't','have','haven't',
+    'having','he','he'd','he'll','he's','her','here','here's','hers','herself','him','himself','his',
+    'how','how's','i','i'd','i'll','i'm','i've','if','in','into','is','isn't','it','it's',
+    'its','itself','let's','me','more','most','mustn't','my','myself','no','nor','not','of','off',
+    'on','once','only','or','other','ought','our','ours','ourselves','out','over','own','same','shan't',
+    'she','she'd','she'll','she's','should','shouldn't','so','some','such','than','that','that's',
+    'the','their','theirs','them','themselves','then','there','there's','these','they','they'd','they'll',
+    'they're','they've','this','those','through','to','too','under','until','up','very','was','wasn't',
+    'we','we'd','we'll','we're','we've','were','weren't','what','what's','when','when's','where',
+    'where's','which','while','who','who's','whom','why','why's','with','won't','would','wouldn't',
+    'you','you'd','you'll','you're','you've','your','yours','yourself','yourselves'
 }
 
-def scraper(url, resp):
-    links = extract_next_links(url, resp)
-    return [link for link in links if is_valid(link)]
+ALLOWED_SUFFIXES = (
+    '.ics.uci.edu',
+    '.cs.uci.edu',
+    '.informatics.uci.edu',
+    '.stat.uci.edu'
+)
+ICS_PATH_PREFIX = '/department/information_computer_sciences/'
 
-def extract_next_links(url, resp):
-    # Implementation required.
-    # url: the URL that was used to get the page
-    # resp.url: the actual url of the page
-    # resp.status: the status code returned by the server. 200 is OK, you got the page. Other numbers mean that there was some kind of problem.
-    # resp.error: when status is not 200, you can check the error here, if needed.
-    # resp.raw_response: this is where the page actually is. More specifically, the raw_response has two parts:
-    #         resp.raw_response.url: the url, again
-    #         resp.raw_response.content: the content of the page!
-    # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
+BAD_EXTENSIONS = re.compile(
+    r'.*\.(css|js|bmp|gif|jpe?g|png|svg|ico|tiff?|mid|mp2|mp3'
+    r'|mp4|wav|avi|mov|mpeg|ram|m4v|pdf|docx?'
+    r'|xlsx?|pptx?|zip|rar|gz)$',
+    re.IGNORECASE
+)
+
+MAX_PATH_SEGMENTS = 30
+MAX_NUMERIC_RUN = 3
+
+def is_valid(url: str) -> bool:
     try:
-        # Assuming the raw response is an HTML page.
-        soup = BeautifulSoup(resp.content, "lxml")
-        links = soup.find_all("a", href=True)
-        
-        absolute_links = []
-        for link in links:
-            href = link["href"]
-            full_url = urljoin(url, href)  # Convert relative URLs to absolute URLs
-            absolute_links.append(full_url)
-        
-        return absolute_links
-    except Exception as e:
-        print(f"Error extracting links: {e}")
-        return [] 
+        clean, _ = urldefrag(url)
+        parsed = urlparse(clean)
+        scheme = parsed.scheme.lower()
+        host = parsed.netloc.lower()
+        path = parsed.path
 
-def extract_tokens(resp):
+        if scheme not in ('http', 'https'):
+            return False
+        if BAD_EXTENSIONS.match(path.lower()):
+            return False
+
+        segments = [seg for seg in path.split('/') if seg]
+        if len(segments) > MAX_PATH_SEGMENTS:
+            return False
+        run = 0
+        for seg in segments:
+            if seg.isdigit():
+                run += 1
+                if run >= MAX_NUMERIC_RUN:
+                    return False
+            else:
+                run = 0
+
+        if any(host.endswith(suf) for suf in ALLOWED_SUFFIXES):
+            return True
+        if host == 'today.uci.edu' and path.lower().startswith(ICS_PATH_PREFIX):
+            return True
+        return False
+    except Exception:
+        return False
+
+def extract_next_links(url: str, resp: Response) -> list:
+    out = []
+    if resp.status != 200 or not hasattr(resp.raw_response, 'content'):
+        return out
+    try:
+        soup = BeautifulSoup(resp.raw_response.content, 'lxml')
+        for tag in soup.find_all('a', href=True):
+            href = tag['href']
+            abs_url = urljoin(resp.url, href)
+            clean_url, _ = urldefrag(abs_url)
+            out.append(clean_url)
+    except Exception:
+        pass
+    return out
+
+def extract_tokens(resp: Response) -> list:
     tokens = []
     if resp.status != 200 or not hasattr(resp.raw_response, 'content'):
         return tokens
-    
-    soup = BeautifulSoup(resp.content, "lxml")
-    texts = " ".join(soup.stripped_strings)
-
-            
-    for i in re.findall(r'\w+', texts.lower()):
-        if i not in STOPWORDS:
-            tokens.append(i)
-            
-    for y in tokens:
-        if y in Common_w:
-            Common_w[y] +=1
-        else:
-            Common_w[y] =1
+    soup = BeautifulSoup(resp.raw_response.content, 'lxml')
+    text = ' '.join(soup.stripped_strings)
+    for word in re.findall(r'\w+', text.lower()):
+        if word not in STOPWORDS:
+            tokens.append(word)
     return tokens
-            
 
-def is_valid(url):
-    # Decide whether to crawl this url or not. 
-    # If you decide to crawl it, return True; otherwise return False.
-    # There are already some conditions that return False.
-    try:
-        parsed = urlparse(url)
-        if parsed.scheme not in set(["http", "https"]): # if scheme isnt either http/https
-            return False
-        if re.match(
-            r".*\.(css|js|bmp|gif|jpe?g|ico"
-            + r"|png|tiff?|mid|mp2|mp3|mp4"
-            + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
-            + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
-            + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
-            + r"|epub|dll|cnf|tgz|sha1"
-            + r"|thmx|mso|arff|rtf|jar|csv"
-            + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower()):
-            return False
-
-        if parsed.netloc.endswith(("ics.uci.edu", ".cs.uci.edu", ".information.uci.edu", ".stat.uci.edu")): # if one of the allowed domains
-            return True
-        if parsed.netloc == "today.uci.edu": # if specifically today.uci.edu
-            if parsed.path.startswith("/department/information_computer_sciences/"): # if path correct per assignemnt instructions
-                return True
-    
-        return False
-
-    except TypeError:
-        print ("TypeError for ", parsed)
-        raise
+def scraper(url: str, resp: Response) -> list:
+    if resp.status != 200:
+        return []
+    content_type = resp.raw_response.headers.get('Content-Type', '').lower()
+    if 'text/html' not in content_type:
+        return []
+    clean_page, _ = urldefrag(resp.url)
+    if clean_page not in seen_urls:
+        seen_urls.add(clean_page)
+        host = urlparse(clean_page).netloc.lower()
+        subdomain_counts[host] += 1
+        tokens = extract_tokens(resp)
+        page_word_counts[clean_page] = len(tokens)
+        word_freq.update(tokens)
+    raw_links = extract_next_links(url, resp)
+    return [link for link in raw_links if is_valid(link)]
