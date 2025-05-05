@@ -61,7 +61,7 @@ def extract_tokens(resp):
             
     for i in re.findall(r'\w+', texts.lower()):
         if i not in STOPWORDS:
-            tokens.append(word)
+            tokens.append(i)
 
     return tokens
             
