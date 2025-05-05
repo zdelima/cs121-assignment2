@@ -98,7 +98,7 @@ def extract_next_links(url: str, resp: Response) -> list:
     return out
 
 def extract_tokens(resp: Response) -> list:
-    global longest_url, lonest_wcount
+    global longest_url, longest_wcount
     tokens = []
     if resp.status != 200 or not hasattr(resp.raw_response, 'content'):
         return tokens
@@ -112,7 +112,7 @@ def extract_tokens(resp: Response) -> list:
         if y in common_w:
             common_w[y] +=1
         else:
-            cmmon_w[y] = 1
+            common_w[y] = 1
 
     count = len(tokens)
     if count > longest_wcount:
