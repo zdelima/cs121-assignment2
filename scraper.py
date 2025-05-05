@@ -9,6 +9,9 @@ seen_urls = set()
 page_word_counts = {}
 word_freq = Counter()
 subdomain_counts = defaultdict(int)
+common_w = {}
+longest_url = None
+longest_wcount = 0
 
 STOPWORDS = {
     'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any', 'are', 'aren\'t',
@@ -95,6 +98,7 @@ def extract_next_links(url: str, resp: Response) -> list:
     return out
 
 def extract_tokens(resp: Response) -> list:
+    global longest_url, lonest_wcount
     tokens = []
     if resp.status != 200 or not hasattr(resp.raw_response, 'content'):
         return tokens
@@ -103,6 +107,18 @@ def extract_tokens(resp: Response) -> list:
     for word in re.findall(r'\w+', text.lower()):
         if word not in STOPWORDS:
             tokens.append(word)
+
+    for y in tokens:
+        if y in common_w:
+            common_w[y] +=1
+        else:
+            cmmon_w[y] = 1
+
+    count = len(tokens)
+    if count > longest_wcount:
+        longest_url = resp.raw_response.url
+        longest_wcount = count
+            
     return tokens
 
 def scraper(url: str, resp: Response) -> list:
