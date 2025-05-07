@@ -1,5 +1,5 @@
 import re
-from urllib.parse import urlparse, urlparse, urldefrag, urljoin
+from urllib.parse import urlparse, urldefrag, urljoin
 from bs4 import BeautifulSoup
 from collections import Counter
 
@@ -56,8 +56,6 @@ def extract_next_links(url, resp):
         soup = BeautifulSoup(resp.raw_response.content, 'lxml')
     
         defrag_url, _ = urldefrag(url)
-
-        unique_pages.add(defrag_url)
         
         visible_text = soup.get_text(separator=' ', strip=True)
         tokens = re.findall(r'\b\w+\b', visible_text.lower())
@@ -65,7 +63,7 @@ def extract_next_links(url, resp):
         if len(tokens) < 200: # if page has low textual information
             return out
         
-        filtered_words = [word for word in visible_text if word not in STOPWORDS]
+        filtered_words = [word for word in tokens if word not in STOPWORDS and len(word) > 1 and word.isalpha()]
 
         calculate_stats(filtered_words, url)
         
@@ -74,23 +72,24 @@ def extract_next_links(url, resp):
             abs_url = urljoin(resp.url, href)
             clean_url, _ = urldefrag(abs_url)
             out.append(clean_url)
+
+        print(f"[DEBUG] Found {len(out)} links on {url}")
             
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[ERROR] Failed to extract links from {url}: {e}")
     return out
 
 def calculate_stats(words, url):
     global longest_page, word_frequencies, subdomains
     
     if len(words) > longest_page[1]: # longest page
-        longest_page[0] = url
-        longest_page[1] = len(words)
+        longest_page =  (url, len(words))
         
     word_frequencies.update(words) # 50 most common words
     
     parsed = urlparse(url)
-    if parsed.domain.endswith('.uci.edu'): # subdomains
-        Counter[parsed.domain] += 1
+    if parsed.netloc.endswith('.uci.edu'): # subdomains
+        subdomains[parsed.netloc] += 1
         
     make_report()
     
@@ -100,6 +99,7 @@ def find_calendar(url):
         r'/\d{4}/\d{1,2}/?',
         r'/\d{1,2}-\d{1,2}-\d{4}',
         r'/\d{4}-\d{1,2}-\d{1,2}',
+        r'/\d{4}-\d{2}(?!-\d{2})',
     ]
     
     for date in calendar_patterns:
@@ -168,21 +168,21 @@ def is_valid(url):
         raise
     
 def make_report():
-    print(f"1. Number of unique pages found: {len(unique_pages)}")
-    print(f"2. Longest page in terms of number of words: {longest_page[0]}, {longest_page[1]}")
-    print("3. 50 most common words in the entire set of pages:")
-    for word, count in word_frequencies.most_common(50):
-        print((word, count))
-    print("4. Found subdomains:")
-    for subdomain, count in subdomains.most_common():
-        print((subdomain, count))
+    #print(f"1. Number of unique pages found: {len(unique_pages)}")
+    #print(f"2. Longest page in terms of number of words: {longest_page[0]}, {longest_page[1]}")
+    #print("3. 50 most common words in the entire set of pages:")
+    #for word, count in word_frequencies.most_common(50):
+    #    print((word, count))
+    #print("4. Found subdomains:")
+    #for subdomain, count in subdomains.most_common():
+    #    print((subdomain, count))
         
     with open("report.txt", "w") as f:
-        f.write(f"1. Number of unique pages found: {len(unique_pages)}")
-        f.write(f"2. Longest page in terms of number of words: {longest_page[0]}, {longest_page[1]}")
-        f.write("3. 50 most common words in the entire set of pages:")
+        f.write(f"1. Number of unique pages found: {len(unique_pages)}\n")
+        f.write(f"2. Longest page in terms of number of words: {longest_page[0]}, {longest_page[1]}\n")
+        f.write("3. 50 most common words in the entire set of pages:\n")
         for word, count in word_frequencies.most_common(50):
-            f.write((word, count))
-        f.write("4. Found subdomains:")
+            f.write(f"{word}: {count}\n")
+        f.write("4. Found subdomains:\n")
         for subdomain, count in subdomains.most_common():
-            f.write((subdomain, count))
+            f.write(f"{subdomain}: {count}\n")
