@@ -22,6 +22,8 @@ class TestScraper(unittest.TestCase):
         self.assertFalse(is_valid("https://ics.uci.edu/events.war"))
         self.assertFalse(is_valid("https://gitlab.ics.uci.edu/test/commit"))
         self.assertFalse(is_valid("https://ics.uci.edu/~eppstein/ca"))
+        self.assertFalse(is_valid("https://plrg.eecs.uci.edu/"))
+        self.assertFalse(is_valid("https://grape.ics.uci.edu/wiki/public/wiki/cs222-2017-fall?version=31&format=txt"))
 
     def test_calendar_patterns(self):
         matches = [

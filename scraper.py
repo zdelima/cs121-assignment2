@@ -121,6 +121,8 @@ def find_traps(url):
         return True
     if "grape" in parsed.path.lower():
         return True
+    if "grape" in parsed.netloc.lower():
+        return True
     if "eventdate" in parsed.query.lower():
         return True
     if "ical" in parsed.query.lower():
@@ -138,6 +140,8 @@ def is_valid(url):
     # There are already some conditions that return False.
     try:
         parsed = urlparse(url)
+        netloc = parsed.netloc.lower()
+        path = parsed.path.lower()
         defrag_url, _ = urldefrag(url)
         
         if defrag_url in unique_pages:
@@ -158,7 +162,7 @@ def is_valid(url):
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz"
             + r"|sql|apk|war|img)$", parsed.path.lower()):
             return False
-        if not any(parsed.netloc.lower().endswith(suf) for suf in ALLOWED_SUFFIXES) and not (parsed.netloc.lower() == "today.uci.edu" and parsed.path.lower().startswith(ICS_PATH_PREFIX)):
+        if not (any(netloc == suf or netloc.endswith(f".{suf}") for suf in ALLOWED_SUFFIXES) or (netloc == "today.uci.edu" and path.startswith(ICS_PATH_PREFIX))):
             return False
         if find_traps(url):
             return False
