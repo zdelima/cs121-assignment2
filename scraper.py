@@ -66,6 +66,7 @@ def extract_next_links(url, resp):
         filtered_words = [word for word in tokens if word not in STOPWORDS and len(word) > 1 and word.isalpha()]
 
         calculate_stats(filtered_words, url)
+        unique_pages.add(defrag_url)
         
         for tag in soup.find_all('a', href=True): # get all links
             href = tag['href']
@@ -146,9 +147,6 @@ def is_valid(url):
         
         if defrag_url in unique_pages:
             return False
-        else:
-            unique_pages.add(defrag_url)
-        
         if parsed.scheme not in set(["http", "https"]):
             return False
         if re.match(

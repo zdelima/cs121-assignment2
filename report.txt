@@ -1,4 +1,4 @@
-1. Number of unique pages found: 84160
+1. Number of unique pages found: 7040
 2. Longest page in terms of number of words: http://cdb.ics.uci.edu/supplement/randomSmiles100K, 185702
 3. 50 most common words in the entire set of pages:
 cc: 71431
